@@ -1,6 +1,7 @@
 const { NodeSDK } = require('@opentelemetry/sdk-node');
 const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
 const { OTLPMetricExporter } = require('@opentelemetry/exporter-metrics-otlp-http');
+const { PeriodicExportingMetricReader } = require('@opentelemetry/sdk-metrics');
 const { Resource } = require('@opentelemetry/resources');
 const { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } = require('@opentelemetry/semantic-conventions');
 const opentelemetry = require('@opentelemetry/api');
@@ -46,13 +47,17 @@ const metricExporter = new OTLPMetricExporter({
   headers: customHeaders,
 });
 
+// Create a metric reader
+const metricReader = new PeriodicExportingMetricReader({
+  exporter: metricExporter,
+  exportIntervalMillis: 5000,
+});
+
 // Initialize the SDK
 const sdk = new NodeSDK({
   resource: resource,
   traceExporter: traceExporter,
-  metricReader: {
-    exporter: metricExporter,
-  },
+  metricReader: metricReader,
 });
 
 // Start the SDK

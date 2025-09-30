@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -49,7 +50,7 @@ func (p *trustGatewayProcessor) processLogs(ctx context.Context, ld plog.Logs) (
 }
 
 // validateTelemetry checks if the telemetry data contains valid authentication tokens
-// The custom headers are expected to be passed as resource attributes by the receiver
+// The custom headers are expected to be passed as resource attributes by the sender
 func (p *trustGatewayProcessor) validateTelemetry(resources interface{}) error {
 	// Check if we have any required headers configured
 	if len(p.config.RequiredHeaders) == 0 && len(p.config.ValidAPIKeys) == 0 {
@@ -57,7 +58,7 @@ func (p *trustGatewayProcessor) validateTelemetry(resources interface{}) error {
 		return nil
 	}
 
-	var attrs map[string]interface{}
+	var attrs pcommon.Map
 	
 	// Extract attributes based on telemetry type
 	switch r := resources.(type) {
@@ -65,44 +66,43 @@ func (p *trustGatewayProcessor) validateTelemetry(resources interface{}) error {
 		if r.Len() == 0 {
 			return fmt.Errorf("no resource spans found")
 		}
-		attrs = extractAttributes(r.At(0).Resource().Attributes())
+		attrs = r.At(0).Resource().Attributes()
 	case pmetric.ResourceMetricsSlice:
 		if r.Len() == 0 {
 			return fmt.Errorf("no resource metrics found")
 		}
-		attrs = extractAttributes(r.At(0).Resource().Attributes())
+		attrs = r.At(0).Resource().Attributes()
 	case plog.ResourceLogsSlice:
 		if r.Len() == 0 {
 			return fmt.Errorf("no resource logs found")
 		}
-		attrs = extractAttributes(r.At(0).Resource().Attributes())
+		attrs = r.At(0).Resource().Attributes()
 	default:
 		return fmt.Errorf("unknown resource type")
 	}
 
 	// Validate required headers are present
 	for _, header := range p.config.RequiredHeaders {
-		if _, ok := attrs[header]; !ok {
+		val, ok := attrs.Get(header)
+		if !ok {
 			return fmt.Errorf("missing required header: %s", header)
 		}
+		p.logger.Debug("Found required header", zap.String("header", header), zap.String("value", val.AsString()))
 	}
 
 	// Validate API key if configured
 	if len(p.config.ValidAPIKeys) > 0 {
-		apiKey, ok := attrs["X-API-Key"]
+		apiKeyVal, ok := attrs.Get("X-API-Key")
 		if !ok {
 			return fmt.Errorf("missing X-API-Key header")
 		}
 		
-		apiKeyStr, ok := apiKey.(string)
-		if !ok {
-			return fmt.Errorf("X-API-Key must be a string")
-		}
-
+		apiKey := apiKeyVal.AsString()
 		valid := false
 		for _, validKey := range p.config.ValidAPIKeys {
-			if apiKeyStr == validKey {
+			if apiKey == validKey {
 				valid = true
+				p.logger.Debug("API key validated successfully")
 				break
 			}
 		}
@@ -111,20 +111,6 @@ func (p *trustGatewayProcessor) validateTelemetry(resources interface{}) error {
 		}
 	}
 
+	p.logger.Info("Telemetry validation passed")
 	return nil
-}
-
-// extractAttributes converts pcommon.Map to a regular map
-func extractAttributes(attrs interface{}) map[string]interface{} {
-	result := make(map[string]interface{})
-	
-	// Type assertion to get the actual attributes map
-	if attrMap, ok := attrs.(interface{ Range(func(string, interface{}) bool) }); ok {
-		attrMap.Range(func(k string, v interface{}) bool {
-			result[k] = v
-			return true
-		})
-	}
-	
-	return result
 }
