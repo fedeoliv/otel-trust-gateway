@@ -30,3 +30,12 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Node.js
+node_modules/
+package-lock.json
+yarn.lock
+
+# Collector binaries
+otelcol-custom
+dist/

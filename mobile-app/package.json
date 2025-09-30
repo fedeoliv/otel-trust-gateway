@@ -1,0 +1,24 @@
+{
+  "name": "mobile-app-sample",
+  "version": "1.0.0",
+  "description": "Sample mobile app sending telemetry to custom OTel collector",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "opentelemetry",
+    "mobile",
+    "collector"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/sdk-node": "^0.59.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.59.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.59.0",
+    "@opentelemetry/resources": "^1.28.0",
+    "@opentelemetry/semantic-conventions": "^1.28.0"
+  }
+}
