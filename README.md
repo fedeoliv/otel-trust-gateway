@@ -2,7 +2,7 @@
 
 Standard OpenTelemetry collectors don't validate source trustworthiness—critical for mobile apps vulnerable to emulator farms, device tampering, and token replay attacks.
 
-This custom collector acts as a **trust gateway**—validating device attestations and cryptographic proofs in HTTP headers *before* accepting telemetry and exporting to observability systems.
+This custom collector acts as a **trust gateway**—validating device attestations and cryptographic proofs in HTTP headers _before_ accepting telemetry and exporting to observability systems.
 
 > [!WARNING]
 > This project is **highly experimental** and under active development.
@@ -33,18 +33,20 @@ graph LR
     subgraph A[Mobile App]
         A1[OTLP Exporters<br/>traces, metrics, logs]
     end
-    
+
     A1 -->|OTLP/HTTP with<br/>custom headers| C
-    
+
     subgraph B[Custom OTel Collector]
         C[OTLP <br/>Receiver]
         D[Trust Gateway<br/> Processor]
         E[Batch <br/>Processor]
         F[Debug <br/>Exporter]
-        
+        G[Azure Monitor<br/>Exporter]
+
         C --> D
         D --> E
         E --> F
+        E --> G
     end
 ```
 
@@ -55,11 +57,13 @@ graph LR
 The trust gateway processor (`processor/trustgatewayprocessor`) acts as a security checkpoint in the telemetry pipeline:
 
 **Validation Steps:**
+
 1. **Header Presence Check**: Verifies all required headers exist in resource attributes
 2. **API Key Verification**: Validates the API key against a configured whitelist (simulating device enrollment database lookup)
 3. **Telemetry Rejection**: Drops data from unverified sources with detailed logging for security audits
 
 **How It Works:**
+
 - Intercepts telemetry data at the processor stage (after receiver, before export)
 - Extracts device identity claims from OTLP resource attributes
 - In a production system, this would validate cryptographic signatures; here we use API keys for demonstration
@@ -189,6 +193,7 @@ npm start
 5. **Observability**: Shows how properly authenticated telemetry flows through the trust gateway
 
 **Key Integration Patterns:**
+
 - Custom resource attributes carry device identity claims
 - HTTP headers are mapped to OTLP resource attributes
 - Error handling demonstrates graceful degradation when validation fails
@@ -223,26 +228,26 @@ The collector will reject the telemetry data, and you'll see validation warnings
 
 ### Collector Configuration
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
+| Parameter          | Description                          | Default           |
+| ------------------ | ------------------------------------ | ----------------- |
 | `required_headers` | List of headers that must be present | `["X-App-Token"]` |
-| `valid_api_keys` | Whitelist of valid API keys | `[]` |
+| `valid_api_keys`   | Whitelist of valid API keys          | `[]`              |
 
 ### Mobile App Configuration
 
-| Environment Variable | Description | Default |
-|---------------------|-------------|---------|
-| `COLLECTOR_URL` | OTel collector endpoint | `http://localhost:4318` |
-| `API_KEY` | API key for authentication | `mobile-app-secret-key-123` |
-| `APP_TOKEN` | Application token | `my-mobile-app-token` |
+| Environment Variable | Description                | Default                     |
+| -------------------- | -------------------------- | --------------------------- |
+| `COLLECTOR_URL`      | OTel collector endpoint    | `http://localhost:4318`     |
+| `API_KEY`            | API key for authentication | `mobile-app-secret-key-123` |
+| `APP_TOKEN`          | Application token          | `my-mobile-app-token`       |
 
 ## Ports
 
-| Port | Protocol | Description |
-|------|----------|-------------|
-| 4317 | gRPC | OTLP gRPC receiver |
-| 4318 | HTTP | OTLP HTTP receiver |
-| 13133 | HTTP | Health check endpoint |
+| Port  | Protocol | Description           |
+| ----- | -------- | --------------------- |
+| 4317  | gRPC     | OTLP gRPC receiver    |
+| 4318  | HTTP     | OTLP HTTP receiver    |
+| 13133 | HTTP     | Health check endpoint |
 
 ## Development
 
@@ -277,6 +282,7 @@ The collector will reject the telemetry data, and you'll see validation warnings
 5. **Test**: Write unit tests and integration tests
 
 **Example:**
+
 ```go
 // In main.go
 import "custom-otel-collector/processor/myprocessor"
@@ -306,7 +312,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, trustgateway, batch]
-      exporters: [debug, otlp]  # Add your exporter here
+      exporters: [debug, otlp] # Add your exporter here
 ```
 
 ### Custom Validation Logic
