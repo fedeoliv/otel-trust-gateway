@@ -13,6 +13,9 @@ This guide will help you get the custom OpenTelemetry Collector and mobile app s
 ### Step 1: Build the Collector
 
 ```bash
+# Navigate to the collector directory
+cd src/otel-collector
+
 # Build the collector binary
 go build -o otelcol-custom .
 ```
@@ -38,7 +41,7 @@ In a new terminal:
 
 ```bash
 # Navigate to mobile app directory
-cd mobile-app
+cd src/mobile-app
 
 # Install dependencies
 npm install
@@ -63,6 +66,9 @@ In the collector terminal, you should see:
 ## Docker Quick Start
 
 ```bash
+# Navigate to collector directory
+cd src/otel-collector
+
 # Build the Docker image
 docker build -t otelcol-custom .
 
@@ -73,6 +79,7 @@ docker run -p 4317:4317 -p 4318:4318 -p 13133:13133 otelcol-custom
 Or use Docker Compose:
 
 ```bash
+cd src/otel-collector
 docker-compose up
 ```
 
@@ -81,7 +88,7 @@ docker-compose up
 ### Test with Valid Credentials
 
 ```bash
-cd mobile-app
+cd src/mobile-app
 npm start
 ```
 
@@ -90,7 +97,7 @@ Expected: ✅ Telemetry data is accepted and processed
 ### Test with Invalid API Key
 
 ```bash
-cd mobile-app
+cd src/mobile-app
 API_KEY=invalid-key npm start
 ```
 
@@ -99,7 +106,7 @@ Expected: ⚠️ Collector logs show "invalid API key" warnings
 ### Test with Different Endpoint
 
 ```bash
-cd mobile-app
+cd src/mobile-app
 COLLECTOR_URL=http://your-collector:4318 npm start
 ```
 
@@ -114,7 +121,7 @@ COLLECTOR_URL=http://your-collector:4318 npm start
 ## Next Steps
 
 1. Read the full [README.md](README.md) for detailed documentation
-2. Modify `config.yaml` to add more API keys or change validation rules
+2. Modify `src/otel-collector/config.yaml` to add more API keys or change validation rules
 3. Extend the processor to add custom validation logic
 4. Add additional exporters to send data to external systems
 
@@ -141,6 +148,7 @@ lsof -ti:8888 | xargs kill -9
 
 ```bash
 # Clean and rebuild
+cd src/otel-collector
 rm otelcol-custom
 go mod tidy
 go build -o otelcol-custom .

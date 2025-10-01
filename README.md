@@ -57,9 +57,11 @@ processors:
 
 ```bash
 # Build locally
+cd src/otel-collector
 go build -o otelcol-custom .
 
 # Build Docker image
+cd src/otel-collector
 docker build -t otelcol-custom .
 ```
 
@@ -69,6 +71,7 @@ docker build -t otelcol-custom .
 
 ```bash
 # Start the collector
+cd src/otel-collector
 ./otelcol-custom --config config.yaml
 ```
 
@@ -76,6 +79,7 @@ docker build -t otelcol-custom .
 
 ```bash
 # Build the image
+cd src/otel-collector
 docker build -t otelcol-custom .
 
 # Run the container
@@ -84,35 +88,19 @@ docker run -p 4317:4317 -p 4318:4318 -p 13133:13133 otelcol-custom
 
 ### Option 3: Run with Docker Compose
 
-Create a `docker-compose.yml`:
-
-```yaml
-version: '3'
-services:
-  collector:
-    build: .
-    ports:
-      - "4317:4317"  # OTLP gRPC
-      - "4318:4318"  # OTLP HTTP
-      - "13133:13133"  # Health check
-    volumes:
-      - ./config.yaml:/root/config.yaml
-```
-
-Then run:
-
 ```bash
+cd src/otel-collector
 docker-compose up
 ```
 
 ## Mobile App Sample
 
-The `mobile-app` directory contains a Node.js application demonstrating how to send telemetry with custom headers.
+The `src/mobile-app` directory contains a Node.js application demonstrating how to send telemetry with custom headers.
 
 ### Setup Mobile App
 
 ```bash
-cd mobile-app
+cd src/mobile-app
 npm install
 ```
 
@@ -142,10 +130,11 @@ npm start
 
 ```bash
 # Start the collector
+cd src/otel-collector
 ./otelcol-custom --config config.yaml
 
 # In another terminal, run the mobile app
-cd mobile-app
+cd src/mobile-app
 npm start
 ```
 
@@ -192,12 +181,14 @@ The collector will reject the telemetry data, and you'll see validation warnings
 
 ```
 .
-├── main.go                          # Collector entry point
-├── config.yaml                      # Collector configuration
-├── Dockerfile                       # Docker build file
-├── processor/
-│   └── trustgatewayprocessor/      # Custom processor
-│       ├── config.go               # Processor configuration
+├── src/
+│   ├── otel-collector/             # Custom collector
+│   │   ├── main.go                 # Collector entry point
+│   │   ├── config.yaml             # Collector configuration
+│   │   ├── Dockerfile              # Docker build file
+│   │   ├── processor/
+│   │   │   └── trustgatewayprocessor/  # Custom processor
+│   │   │       ├── config.go       # Processor configuration
 │       ├── factory.go              # Processor factory
 │       └── processor.go            # Processor logic
 └── mobile-app/                      # Sample mobile application
