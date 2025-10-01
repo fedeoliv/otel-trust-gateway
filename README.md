@@ -1,8 +1,11 @@
-# custom-otel-collector
+# OpenTelemetry Trust Gateway for Mobile Apps
 
 Standard OpenTelemetry collectors don't validate source trustworthiness—critical for mobile apps vulnerable to emulator farms, device tampering, and token replay attacks.
 
 This custom collector acts as a **trust gateway**—validating device attestations and cryptographic proofs in HTTP headers *before* accepting telemetry and exporting to observability systems.
+
+> [!WARNING]
+> This project is **highly experimental** and under active development.
 
 ## Context & Assumptions
 
@@ -15,11 +18,13 @@ The architecture model ensures every action or request is cryptographically tied
 
 ## Features
 
-- **Trust Gateway Processor**: Custom processor that validates HTTP headers and API keys
-- **Header Validation**: Ensures required headers (`X-App-Token`, `X-API-Key`) are present
-- **API Key Authentication**: Validates API keys against a configured whitelist
-- **Containerized Deployment**: Docker support for easy deployment
-- **Sample Mobile App**: JavaScript-based sample application demonstrating integration
+- **Trust Gateway Processor**: Custom OpenTelemetry processor that validates device attestations through HTTP headers before accepting telemetry data
+- **Header Validation**: Enforces presence of required headers (`X-App-Token`, `X-API-Key`) representing device identity claims
+- **API Key Authentication**: Validates API keys against a configured whitelist to simulate device enrollment verification
+- **Telemetry Rejection**: Automatically drops telemetry from unverified sources, preventing data pollution
+- **Containerized Deployment**: Production-ready Docker and Docker Compose configurations
+- **Kubernetes Ready**: Includes K8s deployment manifests for cloud-native environments
+- **Sample Mobile App**: Reference Node.js application demonstrating proper integration patterns
 
 ## Architecture
 
@@ -47,10 +52,18 @@ graph LR
 
 ### Custom Processor: Trust Gateway
 
-The trust gateway processor (`processor/trustgatewayprocessor`) validates:
-1. Required headers are present in resource attributes
-2. API keys match the configured whitelist
-3. Rejects telemetry data if validation fails
+The trust gateway processor (`processor/trustgatewayprocessor`) acts as a security checkpoint in the telemetry pipeline:
+
+**Validation Steps:**
+1. **Header Presence Check**: Verifies all required headers exist in resource attributes
+2. **API Key Verification**: Validates the API key against a configured whitelist (simulating device enrollment database lookup)
+3. **Telemetry Rejection**: Drops data from unverified sources with detailed logging for security audits
+
+**How It Works:**
+- Intercepts telemetry data at the processor stage (after receiver, before export)
+- Extracts device identity claims from OTLP resource attributes
+- In a production system, this would validate cryptographic signatures; here we use API keys for demonstration
+- Failed validation prevents data from reaching exporters, reducing noise and potential security risks
 
 ### Configuration
 
@@ -140,10 +153,16 @@ npm start
 
 ### What the Mobile App Does
 
-1. Initializes OpenTelemetry SDK with custom headers
-2. Sets resource attributes including API key and app token
-3. Sends sample traces and metrics to the collector
-4. Demonstrates both valid and invalid authentication attempts
+1. **Initializes OpenTelemetry SDK**: Configures OTLP exporters for traces, metrics, and logs
+2. **Sets Device Identity Attributes**: Attaches API key and app token as resource attributes (simulating device enrollment data)
+3. **Generates Sample Telemetry**: Creates traces and metrics to demonstrate the full pipeline
+4. **Tests Validation**: Demonstrates both valid (authorized) and invalid (rejected) scenarios
+5. **Observability**: Shows how properly authenticated telemetry flows through the trust gateway
+
+**Key Integration Patterns:**
+- Custom resource attributes carry device identity claims
+- HTTP headers are mapped to OTLP resource attributes
+- Error handling demonstrates graceful degradation when validation fails
 
 ## Testing
 
@@ -219,10 +238,26 @@ The collector will reject the telemetry data, and you'll see validation warnings
 
 ### Adding New Processors
 
-1. Create a new directory under `processor/`
-2. Implement the processor interface
-3. Add the processor to `main.go`
-4. Update `config.yaml` with processor configuration
+1. **Create Processor Directory**: `mkdir -p processor/myprocessor`
+2. **Implement Required Files**:
+   - `config.go`: Define configuration struct
+   - `factory.go`: Implement processor factory interface
+   - `processor.go`: Core processing logic
+3. **Register in Collector**: Import and add to builder in `main.go`
+4. **Configure Pipeline**: Add processor to `config.yaml` service pipelines
+5. **Test**: Write unit tests and integration tests
+
+**Example:**
+```go
+// In main.go
+import "custom-otel-collector/processor/myprocessor"
+
+// Add to WithProcessors
+.WithProcessors(
+    myprocessor.NewFactory(),
+    // ... other processors
+)
+```
 
 ## Extending
 
@@ -275,7 +310,3 @@ func (p *trustGatewayProcessor) validateTelemetry(resources interface{}) error {
 1. Ensure Go modules are properly initialized
 2. Run `go mod tidy` before building
 3. Check Docker daemon is running
-
-## License
-
-MIT License - see LICENSE file for details
