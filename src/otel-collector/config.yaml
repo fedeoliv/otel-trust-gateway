@@ -7,14 +7,25 @@ receivers:
         endpoint: 0.0.0.0:4317
 
 processors:
-  batch:
-    timeout: 10s
-    send_batch_size: 1024
-  
+  # Memory Limiter Processor
+  # Prevents the collector from running out of memory by monitoring and limiting memory usage.
+  # - Checks memory usage every 1 second
+  # - Sets a soft limit at 80% (~205 MiB) where collector starts refusing new data
+  # - Sets a hard limit at 256 MiB where collector forces garbage collection
+  # - Spike limit allows temporary bursts up to 64 MiB above the limit
+  # - Protects system from OOM crashes, essential for production
+  # - Tuned for mobile app traffic (lower memory footprint)
   memory_limiter:
     check_interval: 1s
-    limit_mib: 512
-  
+    limit_mib: 256
+    spike_limit_mib: 64
+
+  # Trust Gateway Processor (Custom)
+  # Validates authentication tokens and required headers from mobile applications.
+  # - Checks that required headers are present in resource attributes
+  # - Validates API keys against a whitelist
+  # - Rejects telemetry data if validation fails
+  # - Acts as a security gateway before data is exported
   trustgateway:
     # Headers that must be present in the resource attributes
     required_headers:
@@ -24,10 +35,21 @@ processors:
       - "mobile-app-secret-key-123"
       - "mobile-app-secret-key-456"
 
+  # Batch Processor
+  # Groups telemetry data into batches before sending to exporters for better performance.
+  # - Sends batch after 5 seconds even if not full (lower latency for mobile apps)
+  # - Sends batch when it reaches 100 spans/metrics/logs
+  # - Reduces network calls: 1000 spans = ~10 requests instead of 1000
+  # - Improves throughput and reduces CPU usage
+  # - Tuned for mobile app traffic (smaller batches, faster send)
+  batch:
+    timeout: 5s
+    send_batch_size: 100
+
 exporters:
   debug:
     verbosity: detailed
-  
+
   # Example OTLP exporter to send to external system
   # otlp:
   #   endpoint: "external-otel-collector:4317"
@@ -40,6 +62,9 @@ extensions:
 
 service:
   extensions: [health_check]
+  telemetry:
+    logs:
+      level: info # Options: debug, info, warn, error
   pipelines:
     traces:
       receivers: [otlp]
