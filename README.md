@@ -65,7 +65,7 @@ The trust gateway processor (`processor/trustgatewayprocessor`) acts as a securi
 - In a production system, this would validate cryptographic signatures; here we use API keys for demonstration
 - Failed validation prevents data from reaching exporters, reducing noise and potential security risks
 
-### Configuration
+### Collector Configuration
 
 The collector is configured via `config.yaml`:
 
@@ -79,52 +79,81 @@ processors:
       - "mobile-app-secret-key-456"
 ```
 
-## Building
+## Prerequisites
 
-### Prerequisites
+- **Go 1.24 or later** - Required to build the collector from source
+- **Docker & Docker Compose** (optional) - For containerized deployment
+- **Node.js 20+** (optional) - Only needed to run the sample mobile app
+- Azure Application Insights
 
-- Go 1.24 or later
-- Docker (for containerization)
-- Node.js 20+ (for mobile app sample)
+## Getting Started
 
-### Build the Collector
+### Running Locally
+
+Build the OTel Collector:
 
 ```bash
-# Build locally
 cd src/otel-collector
 go build -o otelcol-custom .
-
-# Build Docker image
-cd src/otel-collector
-docker build -t otelcol-custom .
 ```
 
-## Running
-
-### Option 1: Run Locally
+Configure Azure Application Insights:
 
 ```bash
-# Start the collector
-cd src/otel-collector
+export APPLICATIONINSIGHTS_CONNECTION_STRING="InstrumentationKey=YOUR-KEY;IngestionEndpoint=https://..."
+```
+
+Run the Collector:
+
+```bash
 ./otelcol-custom --config config.yaml
 ```
 
-### Option 2: Run with Docker
+The collector will start and listen on the following ports:
+
+- **4317** (OTLP gRPC)
+- **4318** (OTLP HTTP)
+- **13133** (Health check)
+
+Verify it's running:
 
 ```bash
-# Build the image
-cd src/otel-collector
-docker build -t otelcol-custom .
-
-# Run the container
-docker run -p 4317:4317 -p 4318:4318 -p 13133:13133 otelcol-custom
+curl http://localhost:13133
 ```
 
-### Option 3: Run with Docker Compose
+### Running with Docker
+
+Use Docker for a containerized deployment with easier configuration management.
+
+Configure Azure Application Insights:
 
 ```bash
 cd src/otel-collector
+
+# Copy the example environment file
+cp .env.example .env
+
+# Edit .env and add your connection string
+# APPLICATIONINSIGHTS_CONNECTION_STRING="InstrumentationKey=YOUR-KEY;IngestionEndpoint=https://..."
+```
+
+Build and Run with Docker Compose:
+
+```bash
 docker-compose up
+```
+
+Docker Compose will:
+
+- Build the collector image
+- Load environment variables from `.env` file
+- Start the collector with proper port mappings
+- Automatically restart on failure
+
+Verify if it's running:
+
+```bash
+curl http://localhost:13133
 ```
 
 ## Mobile App Sample
