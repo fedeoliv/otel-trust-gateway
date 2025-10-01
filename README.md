@@ -1,6 +1,17 @@
 # custom-otel-collector
 
-A custom OpenTelemetry Collector that acts as a trust gateway for mobile applications. It validates custom HTTP headers from client applications before exporting telemetry data to external systems.
+Standard OpenTelemetry collectors don't validate source trustworthiness—critical for mobile apps vulnerable to emulator farms, device tampering, and token replay attacks.
+
+This custom collector acts as a **trust gateway**—validating device attestations and cryptographic proofs in HTTP headers *before* accepting telemetry and exporting to observability systems.
+
+## Context & Assumptions
+
+This guide assumes a scenario where device-bound security architecture is essential—such as financial services, healthcare, or any high-security mobile application where device identity is as critical as user identity.
+
+The architecture model ensures every action or request is cryptographically tied to the physical device that generated it. Using hardware-anchored keys, a controlled device enrollment process, and continuous proof-of-possession (PoP) at invocation time, each request is individually signed. This ensures the backend can verify the device, prevent replay attacks, and detect tampering even if credentials or sessions are compromised.
+
+> [!NOTE]
+> The complete implementation of device enrollment with hardware-anchored public keys and request signature generation for proof-of-possession on the mobile app side is out of scope for this repository. This collector demonstrates the trust gateway validation pattern using **dummy header validations** as a simplified example of how device attestations would be verified.
 
 ## Features
 
