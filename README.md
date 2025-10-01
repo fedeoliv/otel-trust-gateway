@@ -12,14 +12,24 @@ A custom OpenTelemetry Collector that acts as a trust gateway for mobile applica
 
 ## Architecture
 
-```
-Mobile App (JavaScript) 
-  ↓ (OTLP/HTTP with custom headers)
-Custom OTel Collector
-  ├─ OTLP Receiver (receives telemetry)
-  ├─ Trust Gateway Processor (validates headers/API keys)
-  ├─ Batch Processor (batches telemetry)
-  └─ Debug Exporter (outputs to console)
+```mermaid
+graph LR
+    subgraph A[Mobile App]
+        A1[OTLP Exporters<br/>traces, metrics, logs]
+    end
+    
+    A1 -->|OTLP/HTTP with<br/>custom headers| C
+    
+    subgraph B[Custom OTel Collector]
+        C[OTLP <br/>Receiver]
+        D[Trust Gateway<br/> Processor]
+        E[Batch <br/>Processor]
+        F[Debug <br/>Exporter]
+        
+        C --> D
+        D --> E
+        E --> F
+    end
 ```
 
 ## Components
