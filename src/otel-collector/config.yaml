@@ -30,6 +30,7 @@ processors:
     # Headers that must be present in the resource attributes
     required_headers:
       - "X-App-Token"
+      - "X-API-Key"
     # Valid API keys for authentication
     valid_api_keys:
       - "mobile-app-secret-key-123"
@@ -50,6 +51,11 @@ exporters:
   debug:
     verbosity: detailed
 
+  # Azure Monitor Exporter
+  # Sends telemetry data to Azure Application Insights
+  azuremonitor:
+    connection_string: "${env:APPLICATIONINSIGHTS_CONNECTION_STRING}"
+
   # Example OTLP exporter to send to external system
   # otlp:
   #   endpoint: "external-otel-collector:4317"
@@ -64,17 +70,17 @@ service:
   extensions: [health_check]
   telemetry:
     logs:
-      level: info # Options: debug, info, warn, error
+      level: debug # Options: debug, info, warn, error
   pipelines:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, trustgateway, batch]
-      exporters: [debug]
+      exporters: [azuremonitor]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, trustgateway, batch]
-      exporters: [debug]
+      exporters: [azuremonitor]
     logs:
       receivers: [otlp]
       processors: [memory_limiter, trustgateway, batch]
-      exporters: [debug]
+      exporters: [azuremonitor]

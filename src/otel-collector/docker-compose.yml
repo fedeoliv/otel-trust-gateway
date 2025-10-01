@@ -10,6 +10,8 @@ services:
       - "13133:13133"  # Health check
     volumes:
       - ./config.yaml:/root/config.yaml:ro
+    environment:
+      - APPLICATIONINSIGHTS_CONNECTION_STRING=${APPLICATIONINSIGHTS_CONNECTION_STRING}
     networks:
       - otel-network
     healthcheck:
