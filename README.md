@@ -1,40 +1,72 @@
-# OpenTelemetry Trust Gateway for Mobile Apps
+# Secure Observability for Mobile Apps at Scale
 
-Standard OpenTelemetry collectors don't validate source trustworthiness—critical for mobile apps vulnerable to emulator farms, device tampering, and token replay attacks.
+This repo showcases a telemetry data pipeline architecture that combines **security validation**, **intelligent sampling**, and **cost-effective observability** for high-volume mobile applications.
 
-This custom collector acts as a **trust gateway**—validating device attestations and cryptographic proofs in HTTP headers _before_ accepting telemetry and exporting to observability systems.
+## Why This Matters
+
+Mobile apps face unique observability challenges that traditional collectors don't address:
+
+1. **Security Risk**: Standard collectors accept telemetry from any source—leaving you vulnerable to emulator farms, device tampering, and fraudulent data pollution
+2. **Volume & Cost**: Millions of mobile devices generate massive telemetry volumes, making cloud ingestion costs spiral out of control
+3. **Lost Context**: Basic sampling can break trace-log correlation, making troubleshooting impossible
+
+## What This Provides
+
+This architecture focus on solving those three problems:
+
+- **🔒 Trust Gateway**: Validates device identity and authenticity before accepting any telemetry
+- **📊 Intelligent Sampling**: Configurable sampling data for cost reduction while maintaining correlated traces and logs
+- **⚡ Scalability**: Handles millions of spans per day with predictable costs and complete observability
+- **🌐 Vendor Neutrality**: Built on OpenTelemetry standard, avoiding vendor lock-in and seamlessly switch or add observability backends
 
 > [!WARNING]
 > This project is **highly experimental** and under active development.
 
-## Context & Assumptions
+## Architecture Philosophy
 
-This guide assumes a scenario where device-bound security architecture is essential—such as financial services, healthcare, or any high-security mobile application where device identity is as critical as user identity.
+This solution is designed for **high-security, high-volume mobile applications**, common in financial services, healthcare, or any scenario where device identity is as critical as user identity.
 
-The architecture model ensures every action or request is cryptographically tied to the physical device that generated it. Using hardware-anchored keys, a controlled device enrollment process, and continuous proof-of-possession (PoP) at invocation time, each request is individually signed. This ensures the backend can verify the device, prevent replay attacks, and detect tampering even if credentials or sessions are compromised.
+**Core Principles:**
+
+- Every telemetry data point is cryptographically tied to a verified physical device
+- Sampling decisions maintain trace-log correlation for effective debugging
+- Cost control through intelligent routing: sampled data to expensive storage, full data to cost-effective destinations
+- Zero-trust approach: validate first, ingest second
 
 > [!NOTE]
 > The complete implementation of device enrollment with hardware-anchored public keys and request signature generation for proof-of-possession on the mobile app side is out of scope for this repository. This collector demonstrates the trust gateway validation pattern using **dummy header validations** as a simplified example of how device attestations would be verified.
 
 ## Features
 
+### Security & Trust
 - **Trust Gateway Processor**: Custom OpenTelemetry processor that validates device attestations through HTTP headers before accepting telemetry data
 - **Header Validation**: Enforces presence of required headers (`X-App-Token`, `X-API-Key`) representing device identity claims
 - **API Key Authentication**: Validates API keys against a configured whitelist to simulate device enrollment verification
 - **Telemetry Rejection**: Automatically drops telemetry from unverified sources, preventing data pollution
+
+### Scalability & Cost Control
+- **Probabilistic Sampling**: Intelligent sampling strategy (10% configurable) for high-volume trace and log data
+- **Correlated Sampling**: Traces and logs are sampled together using trace_id to maintain observability context
+- **Selective Metrics**: Full metrics collection (no sampling) for accurate dashboards and alerting
+- **Multi-Pipeline Architecture**: Separate pipelines for sampled data (cost-effective cloud storage) and full data (comprehensive analysis)
+- **Volume Management**: Designed to handle millions of spans per day while controlling cloud ingestion costs
+
+### Deployment & Integration
 - **Containerized Deployment**: Production-ready Docker and Docker Compose configurations
 - **Kubernetes Ready**: Includes K8s deployment manifests for cloud-native environments
-- **Sample Mobile App**: Reference Node.js application demonstrating proper integration patterns
+- **Azure Application Insights**: Pre-configured for Azure Monitor integration with sampling
+- **Extensible Design**: Ready to add multiple exporters with different sampling strategies
+- **Sample Mobile App**: Reference Node.js application generating 1000 activities with correlated traces and logs
 
 ## Architecture
 
 ```mermaid
 graph LR
     subgraph Mobile[Mobile App]
-        App[OTLP Exporters<br/>traces, metrics, logs]
+        App[OTLP <br/>Exporters]
     end
 
-    App -->|OTLP/HTTP with<br/>custom headers| Receiver
+    App -->|HTTP with<br/>custom headers| Receiver
 
     subgraph Collector[Custom OTel Collector]
         Receiver[OTLP<br/>Receiver]
@@ -48,7 +80,7 @@ graph LR
         end
         
         subgraph Exporters[Exporters]
-            Azure[Azure Monitor<br/>App Insights]
+            Azure[Azure <br/>App Insights]
             Other[Other <br/>Exporters]
         end
         
@@ -87,6 +119,38 @@ The trust gateway processor (`processor/trustgatewayprocessor`) acts as a securi
 - In a production system, this would validate cryptographic signatures; here we use API keys for demonstration
 - Failed validation prevents data from reaching exporters, reducing noise and potential security risks
 
+### Sampling Strategy for Scale
+
+The collector implements a sophisticated sampling strategy designed to handle large volumes of telemetry data while controlling costs:
+
+#### How It Works
+
+**Multiple Pipelines with Different Strategies:**
+
+1. **Sampled Pipeline (Traces + Logs)** → Azure Application Insights
+   - 10% probabilistic sampling (configurable)
+   - Traces and logs are **correlated** via `trace_id`
+   - When a trace is sampled, all its logs are kept together
+   - Perfect for cost-effective cloud storage while maintaining visibility
+
+2. **Full Pipeline (Metrics)** → Azure Application Insights
+   - 100% of metrics sent (no sampling)
+   - Critical for accurate dashboards, alerts, and SLOs
+   - Metrics typically have lower volume than traces/logs
+
+3. **Future Full Pipeline** → Other Exporters (Ready to Enable)
+   - Send 100% of all telemetry to additional systems
+   - Elasticsearch, Prometheus, custom OTLP endpoints, etc.
+   - Comprehensive data for deep analysis when needed
+
+#### Key Design Principles
+
+- **Correlation**: Logs inherit `trace_id` from their parent spans, ensuring sampling keeps related data together
+- **Flexibility**: Different sampling rates per pipeline - aggressive for traces/logs, none for metrics
+- **Multi-Destination**: Send sampled data to expensive cloud storage, full data to cheaper long-term storage
+- **Cost Control**: Handle millions of events per day while keeping cloud ingestion costs predictable
+- **Observability**: 10% sampling still provides statistical significance for most use cases
+
 ### Collector Configuration
 
 The collector is configured via `config.yaml`:
@@ -99,6 +163,29 @@ processors:
     valid_api_keys:
       - "mobile-app-secret-key-123"
       - "mobile-app-secret-key-456"
+  
+  probabilistic_sampler:
+    sampling_percentage: 10  # Adjust based on volume and budget
+
+service:
+  pipelines:
+    # Sampled traces - cost-effective cloud storage
+    traces/sampled:
+      receivers: [otlp]
+      processors: [memory_limiter, trustgateway, probabilistic_sampler, batch/sampled]
+      exporters: [azuremonitor]
+    
+    # Sampled logs - correlated with traces
+    logs/sampled:
+      receivers: [otlp]
+      processors: [memory_limiter, trustgateway, probabilistic_sampler, batch/sampled]
+      exporters: [azuremonitor]
+    
+    # Full metrics - no sampling for accuracy
+    metrics/full:
+      receivers: [otlp]
+      processors: [memory_limiter, trustgateway, batch]
+      exporters: [azuremonitor]
 ```
 
 ## Prerequisites
