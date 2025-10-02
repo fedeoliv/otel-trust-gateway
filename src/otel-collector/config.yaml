@@ -36,7 +36,17 @@ processors:
       - "mobile-app-secret-key-123"
       - "mobile-app-secret-key-456"
 
-  # Batch Processor
+  # Probabilistic Sampling Processor
+  # Samples a percentage of traces to reduce volume sent to Application Insights
+  # - sampling_percentage: 10 means keep 10% of traces, drop 90%
+  # - Uses trace ID for consistent sampling decisions across distributed traces
+  # - All spans in a sampled trace are kept together
+  # - Adjust percentage based on your volume needs (1-100)
+  # Example: 10% of 1M spans/day = 100K spans/day sent to App Insights
+  probabilistic_sampler:
+    sampling_percentage: 10
+
+  # Batch Processor (for full data pipeline)
   # Groups telemetry data into batches before sending to exporters for better performance.
   # - Sends batch after 5 seconds even if not full (lower latency for mobile apps)
   # - Sends batch when it reaches 100 spans/metrics/logs
@@ -46,6 +56,12 @@ processors:
   batch:
     timeout: 5s
     send_batch_size: 100
+
+  # Batch Processor (for sampled data pipeline to Azure Monitor)
+  # Smaller batches for sampled data since volume is reduced
+  batch/sampled:
+    timeout: 10s
+    send_batch_size: 50
 
 exporters:
   debug:
@@ -72,15 +88,48 @@ service:
     logs:
       level: debug # Options: debug, info, warn, error
   pipelines:
-    traces:
+    # ============================================
+    # AZURE MONITOR PIPELINES (Sampled Data)
+    # ============================================
+    
+    # Sampled traces + correlated logs pipeline - sends 10% to Azure Monitor
+    # The probabilistic sampler uses trace_id for sampling decisions
+    # Logs with the same trace_id will be kept together with their traces
+    traces/sampled:
+      receivers: [otlp]
+      processors: [memory_limiter, trustgateway, probabilistic_sampler, batch/sampled]
+      exporters: [azuremonitor]
+    
+    logs/sampled:
+      receivers: [otlp]
+      processors: [memory_limiter, trustgateway, probabilistic_sampler, batch/sampled]
+      exporters: [azuremonitor]
+    
+    # Full metrics pipeline - sends 100% of metrics to Azure Monitor (no sampling)
+    metrics/full:
       receivers: [otlp]
       processors: [memory_limiter, trustgateway, batch]
       exporters: [azuremonitor]
-    metrics:
-      receivers: [otlp]
-      processors: [memory_limiter, trustgateway, batch]
-      exporters: [azuremonitor]
-    logs:
-      receivers: [otlp]
-      processors: [memory_limiter, trustgateway, batch]
-      exporters: [azuremonitor]
+    
+    # ============================================
+    # FUTURE EXPORTER PIPELINES (Full Data)
+    # ============================================
+    # Uncomment these pipelines when you add other exporters
+    # These will receive 100% of all telemetry data
+    
+    # Full traces + logs pipeline - sends 100% to other exporters
+    # traces/full:
+    #   receivers: [otlp]
+    #   processors: [memory_limiter, trustgateway, batch]
+    #   exporters: [debug]  # Replace with: otlp, elasticsearch, etc.
+    
+    # logs/full:
+    #   receivers: [otlp]
+    #   processors: [memory_limiter, trustgateway, batch]
+    #   exporters: [debug]  # Replace with: otlp, elasticsearch, etc.
+    
+    # Full metrics pipeline - sends 100% of metrics to other exporters
+    # metrics/full-export:
+    #   receivers: [otlp]
+    #   processors: [memory_limiter, trustgateway, batch]
+    #   exporters: [debug]  # Replace with: otlp, prometheus, etc.

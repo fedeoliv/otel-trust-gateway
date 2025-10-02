@@ -23,6 +23,7 @@ import (
 	"github.com/fedeoliv/custom-otel-collector/processor/trustgatewayprocessor"
 	azuremonitorexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/azuremonitorexporter"
 	healthcheckextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
+	probabilisticsamplerprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/probabilisticsamplerprocessor"
 )
 
 func main() {
@@ -81,9 +82,10 @@ func components() (otelcol.Factories, error) {
 
 	// Processors
 	factories.Processors = map[component.Type]processor.Factory{
-		batchprocessor.NewFactory().Type():         batchprocessor.NewFactory(),
-		memorylimiterprocessor.NewFactory().Type(): memorylimiterprocessor.NewFactory(),
-		trustgatewayprocessor.NewFactory().Type():  trustgatewayprocessor.NewFactory(),
+		batchprocessor.NewFactory().Type():                batchprocessor.NewFactory(),
+		memorylimiterprocessor.NewFactory().Type():        memorylimiterprocessor.NewFactory(),
+		trustgatewayprocessor.NewFactory().Type():         trustgatewayprocessor.NewFactory(),
+		probabilisticsamplerprocessor.NewFactory().Type(): probabilisticsamplerprocessor.NewFactory(),
 	}
 
 	// Extensions
