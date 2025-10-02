@@ -35,8 +35,14 @@ const { PeriodicExportingMetricReader } = require('@opentelemetry/sdk-metrics');
 const { LoggerProvider, BatchLogRecordProcessor } = require('@opentelemetry/sdk-logs');
 const { logs } = require('@opentelemetry/api-logs');
 const { Resource } = require('@opentelemetry/resources');
-const { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } = require('@opentelemetry/semantic-conventions');
+const { 
+  ATTR_SERVICE_NAME, 
+  ATTR_SERVICE_VERSION,
+  ATTR_SERVICE_NAMESPACE,
+  ATTR_SERVICE_INSTANCE_ID,
+} = require('@opentelemetry/semantic-conventions');
 const opentelemetry = require('@opentelemetry/api');
+const { SpanKind } = require('@opentelemetry/api');
 
 // Configuration
 const COLLECTOR_URL = process.env.COLLECTOR_URL || 'http://localhost:4318';
@@ -56,9 +62,12 @@ console.log(`Using App Token: ${APP_TOKEN}`);
 
 // Create resource with custom attributes
 // These attributes will be added to all telemetry data
+// Including attributes for Application Insights Application Map
 const resource = new Resource({
   [ATTR_SERVICE_NAME]: 'mobile-app-sample',
   [ATTR_SERVICE_VERSION]: '1.0.0',
+  [ATTR_SERVICE_NAMESPACE]: 'mobile-apps',
+  [ATTR_SERVICE_INSTANCE_ID]: `mobile-app-${Math.random().toString(36).substr(2, 9)}`,
   'deployment.environment': 'development',
   'device.platform': 'mobile',
   // Pass the custom headers as resource attributes
@@ -146,18 +155,31 @@ function simulateActivity(activityNumber) {
   const activityType = activityTypes[Math.floor(Math.random() * activityTypes.length)];
   const screen = screens[Math.floor(Math.random() * screens.length)];
   const status = statuses[Math.floor(Math.random() * statuses.length)];
-  
-  const span = tracer.startSpan(`mobile-app-${activityType}`);
   const userId = `user-${Math.floor(Math.random() * 50)}`;
+  
+  // Create a SERVER span for incoming user request/activity
+  // This will show as a REQUEST node in Application Insights Application Map
+  const span = tracer.startSpan(`mobile-app-${activityType}`, {
+    kind: SpanKind.SERVER,
+    attributes: {
+      'http.method': 'POST',
+      'http.route': `/${screen}/${activityType}`,
+      'http.target': `/${screen}/${activityType}`,
+      'user.action': activityType,
+      'screen.name': screen,
+      'activity.number': activityNumber,
+      'user.id': userId,
+    }
+  });
   
   // Create context with the active span so logs inherit trace_id and span_id
   const ctx = opentelemetry.trace.setSpan(opentelemetry.context.active(), span);
   
+  // Create a CLIENT span for the dependency call to the collector
+  // This will show as a DEPENDENCY in Application Insights Application Map
+  let dependencySpan = null;
+  
   try {
-    span.setAttribute('user.action', activityType);
-    span.setAttribute('screen.name', screen);
-    span.setAttribute('activity.number', activityNumber);
-    span.setAttribute('user.id', userId);
     span.addEvent('Activity started');
     
     // Emit log WITH trace context - this log will have the same trace_id as the span
@@ -174,6 +196,19 @@ function simulateActivity(activityNumber) {
         },
       });
     });
+    
+    // Start the dependency span
+    dependencySpan = tracer.startSpan(`POST ${COLLECTOR_URL}/v1/traces`, {
+      kind: SpanKind.CLIENT,
+      attributes: {
+        'http.method': 'POST',
+        'http.url': `${COLLECTOR_URL}/v1/traces`,
+        'http.target': '/v1/traces',
+        'net.peer.name': 'otelcol-custom',
+        'peer.service': 'otelcol-custom',
+        'http.status_code': 200,
+      }
+    }, ctx);
     
     // Simulate some work with varying duration
     const duration = Math.random() * 500; // 0-500ms
@@ -234,6 +269,9 @@ function simulateActivity(activityNumber) {
         'screen': screen,
       });
       
+      // End the dependency span first
+      dependencySpan.end();
+      
       span.addEvent('Activity completed', { status });
       span.end();
       
@@ -259,6 +297,12 @@ function simulateActivity(activityNumber) {
         },
       });
     });
+    
+    // End dependency span if it exists
+    if (dependencySpan) {
+      dependencySpan.setStatus({ code: opentelemetry.SpanStatusCode.ERROR });
+      dependencySpan.end();
+    }
     
     span.end();
   }
