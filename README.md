@@ -30,24 +30,42 @@ The architecture model ensures every action or request is cryptographically tied
 
 ```mermaid
 graph LR
-    subgraph A[Mobile App]
-        A1[OTLP Exporters<br/>traces, metrics, logs]
+    subgraph Mobile[Mobile App]
+        App[OTLP Exporters<br/>traces, metrics, logs]
     end
 
-    A1 -->|OTLP/HTTP with<br/>custom headers| C
+    App -->|OTLP/HTTP with<br/>custom headers| Receiver
 
-    subgraph B[Custom OTel Collector]
-        C[OTLP <br/>Receiver]
-        D[Trust Gateway<br/> Processor]
-        E[Batch <br/>Processor]
-        F[Debug <br/>Exporter]
-        G[Azure Monitor<br/>Exporter]
-
-        C --> D
-        D --> E
-        E --> F
-        E --> G
+    subgraph Collector[Custom OTel Collector]
+        Receiver[OTLP<br/>Receiver]
+        
+        subgraph Processors[Processors]
+            Memory[Memory<br/>Limiter]
+            TrustGW[Trust <br/>Gateway]
+            Sampler[Probabilistic<br/>Sampler<br/>]
+            Batch1[Batch<br/>Sampled]
+            Batch2[Batch<br/>Full]
+        end
+        
+        subgraph Exporters[Exporters]
+            Azure[Azure Monitor<br/>App Insights]
+            Other[Other <br/>Exporters]
+        end
+        
+        Receiver --> Memory
+        Memory --> TrustGW
+        
+        TrustGW --> Sampler
+        Sampler -->|~10% of correlated<br/> traces and logs| Batch1
+        Batch1 --> Azure
+        
+        TrustGW -->|100% of data| Batch2
+        Batch2 --> |metrics|Azure
+        
+        Batch2 -.-> |traces, metrics and logs|Other
     end
+    
+    style Azure fill:#0078d4,stroke:#333,stroke-width:2px,color:#fff
 ```
 
 ## Components
