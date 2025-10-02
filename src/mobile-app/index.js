@@ -5,7 +5,7 @@
  * 
  * Simulation Details:
  * - Generates 1000 activities at 10 activities/second (100 seconds total)
- * - 6 activity types: button_click, p// Run sample activities
+ * - 6 activity types: 'button_click', 'page_view', 'api_call', 'user_input', 'scroll', 'swipe'
  * - 7 different screens: home, profile, settings, checkout, products, cart, login
  * - 50 simulated users (user-0 to user-49)
  * - 75% success rate, 25% error rate
