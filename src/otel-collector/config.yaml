@@ -94,12 +94,14 @@ exporters:
       logs: "logs"
       traces: "traces"
     blob_name_format:
-      metrics_format: "2006/01/02/metrics_15_04_05.json"
-      logs_format: "2006/01/02/logs_15_04_05.json"
-      traces_format: "2006/01/02/traces_15_04_05.json"
+      metrics_format: "2006/01/02/metrics_15_04_05.parquet"
+      logs_format: "2006/01/02/logs_15_04_05.parquet"
+      traces_format: "2006/01/02/traces_15_04_05.parquet"
 
+      # Note: When using format: "parquet", change file extensions to .parquet:
       serial_num_range: 10000
-    format: "json" # Options: "json" or "proto"
+    format: "parquet" # Options: "json", "proto", or "parquet"
+    # Note: "parquet" format provides better compression and is ideal for analytics workloads in Azure Data Lake
     append_blob:
       enabled: false
       separator: "\n"
