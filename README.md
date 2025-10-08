@@ -81,7 +81,7 @@ graph LR
         
         subgraph Exporters[Exporters]
             Azure[Azure <br/>App Insights]
-            Other[Other <br/>Exporters]
+            Other[Azure<br/>Blob Storage]
         end
         
         Receiver --> Memory
@@ -98,6 +98,7 @@ graph LR
     end
     
     style Azure fill:#0078d4,stroke:#333,stroke-width:2px,color:#fff
+    style Other fill:#0078d4,stroke:#333,stroke-width:2px,color:#fff
 ```
 
 ## Components
