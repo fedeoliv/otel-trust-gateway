@@ -80,7 +80,7 @@ type Config struct {
 	// BlobNameFormat is the format of the blob name. It controls the uploaded blob name, e.g. "2006/01/02/metrics_15_04_05.json"
 	BlobNameFormat BlobNameFormat `mapstructure:"blob_name_format"`
 
-	// FormatType is the format of encoded telemetry data. Supported values are json and proto.
+	// FormatType is the format of encoded telemetry data. Supported values are json, proto, and parquet.
 	FormatType string `mapstructure:"format"`
 
 	// AppendBlob configures append blob behavior
@@ -119,7 +119,7 @@ func (c *Config) Validate() error {
 		// DefaultAzureCredential will automatically detect credentials from environment
 	}
 
-	if c.FormatType != "json" && c.FormatType != "proto" {
+	if c.FormatType != "json" && c.FormatType != "proto" && c.FormatType != "parquet" {
 		return errors.New("unknown format type: " + c.FormatType)
 	}
 

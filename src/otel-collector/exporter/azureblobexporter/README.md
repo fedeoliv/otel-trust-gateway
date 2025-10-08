@@ -81,6 +81,36 @@ The exporter supports the following authentication methods:
      type: default_credentials
    ```
 
+## Format Types
+
+The exporter supports three different output formats:
+
+1. **JSON** - Human-readable JSON format (default)
+2. **Proto** - Protocol Buffers binary format (compact, fast)
+3. **Parquet** ⭐ (NEW) - Columnar storage format (optimized for analytics)
+
+### Parquet Format
+
+The Parquet format is ideal for:
+- **Analytics and Data Warehousing**: Columnar storage optimized for queries
+- **Cost Efficiency**: Better compression ratios than JSON
+- **Performance**: Faster query performance in analytics platforms
+- **Integration**: Native support in Azure Synapse, Databricks, and other analytics tools
+
+Example configuration with Parquet:
+```yaml
+exporters:
+  azureblob:
+    url: "https://mystorageaccount.blob.core.windows.net"
+    auth:
+      type: default_credentials
+    format: "parquet"  # Use Parquet format
+    blob_name_format:
+      metrics_format: "2006/01/02/metrics_15_04_05.parquet"
+      logs_format: "2006/01/02/logs_15_04_05.parquet"
+      traces_format: "2006/01/02/traces_15_04_05.parquet"
+```
+
 ## Complete Configuration Example
 
 ```yaml
@@ -99,7 +129,7 @@ exporters:
       traces_format: "2006/01/02/traces_15_04_05.json"
       serial_num_range: 10000
       template_enabled: false
-    format_type: "json"
+    format: "json"  # Options: "json", "proto", "parquet"
     append_blob:
       enabled: false
       separator: "\n"

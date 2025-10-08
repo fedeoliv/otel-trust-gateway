@@ -194,6 +194,8 @@ func newMarshaller(config *Config, host component.Host) (marshaller, error) {
 		return newJSONMarshaller(), nil
 	case formatTypeProto:
 		return newProtoMarshaller(), nil
+	case formatTypeParquet:
+		return newParquetMarshaller(), nil
 	default:
 		return nil, fmt.Errorf("unsupported format type: %s", config.FormatType)
 	}
