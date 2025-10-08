@@ -77,14 +77,37 @@ exporters:
     connection_string: "${env:APPLICATIONINSIGHTS_CONNECTION_STRING}"
     maxbatchsize: 1024
     maxbatchinterval: 10s
-    spaneventsenabled: true  # Export span events to Application Insights
-    sending_queue:
+    spaneventsenabled: true # Export span events to Application Insights
+
+  # Azure Blob Exporter (Custom with DefaultAzureCredential support)
+  # Exports full telemetry batches to Azure Data Lake Storage
+  # Uses DefaultAzureCredential for automatic credential discovery
+  # - Tries environment variables first (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)
+  # - Falls back to Workload Identity (AKS), Managed Identity (VM), Azure CLI, or Azure PowerShell
+  # - No explicit credentials needed in config - follows Azure SDK best practices
+  azureblob:
+    url: "${env:AZURE_STORAGE_ACCOUNT_URL}"
+    auth:
+      type: default_credentials # Use DefaultAzureCredential for automatic credential discovery
+    container:
+      metrics: "metrics"
+      logs: "logs"
+      traces: "traces"
+    blob_name_format:
+      metrics_format: "2006/01/02/metrics_15_04_05.json"
+      logs_format: "2006/01/02/logs_15_04_05.json"
+      traces_format: "2006/01/02/traces_15_04_05.json"
+
+      serial_num_range: 10000
+    format: "json" # Options: "json" or "proto"
+    append_blob:
+      enabled: false
+      separator: "\n"
+    retry_on_failure:
       enabled: true
-      num_consumers: 10
-      queue_size: 5000  # Buffer up to 5000 batches in memory
-      # For k8s cluster with persistent storage:
-      # storage: file_storage/azuremonitor
-      # shutdown_timeout: 5s 
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 120s
 
   # Example OTLP exporter to send to external system
   # otlp:
@@ -111,45 +134,48 @@ service:
     # ============================================
     # AZURE MONITOR PIPELINES (Sampled Data)
     # ============================================
-    
+
     # Sampled traces + correlated logs pipeline - sends 10% to Azure Monitor
     # The probabilistic sampler uses trace_id for sampling decisions
     # Logs with the same trace_id will be kept together with their traces
     traces/sampled:
       receivers: [otlp]
-      processors: [memory_limiter, trustgateway, probabilistic_sampler, batch/sampled]
+      processors:
+        [memory_limiter, trustgateway, probabilistic_sampler, batch/sampled]
       exporters: [azuremonitor]
-    
+
     logs/sampled:
       receivers: [otlp]
-      processors: [memory_limiter, trustgateway, probabilistic_sampler, batch/sampled]
+      processors:
+        [memory_limiter, trustgateway, probabilistic_sampler, batch/sampled]
       exporters: [azuremonitor]
-    
+
     # Full metrics pipeline - sends 100% of metrics to Azure Monitor (no sampling)
     metrics/full:
       receivers: [otlp]
       processors: [memory_limiter, trustgateway, batch]
       exporters: [azuremonitor]
-    
+
     # ============================================
-    # FUTURE EXPORTER PIPELINES (Full Data)
+    # AZURE BLOB STORAGE PIPELINES (Full Data)
     # ============================================
-    # Uncomment these pipelines when you add other exporters
-    # These will receive 100% of all telemetry data
-    
-    # Full traces + logs pipeline - sends 100% to other exporters
-    # traces/full:
-    #   receivers: [otlp]
-    #   processors: [memory_limiter, trustgateway, batch]
-    #   exporters: [debug]  # Replace with: otlp, elasticsearch, etc.
-    
-    # logs/full:
-    #   receivers: [otlp]
-    #   processors: [memory_limiter, trustgateway, batch]
-    #   exporters: [debug]  # Replace with: otlp, elasticsearch, etc.
-    
-    # Full metrics pipeline - sends 100% of metrics to other exporters
-    # metrics/full-export:
-    #   receivers: [otlp]
-    #   processors: [memory_limiter, trustgateway, batch]
-    #   exporters: [debug]  # Replace with: otlp, prometheus, etc.
+    # These pipelines send 100% of all telemetry data to Azure Blob Storage
+    # Useful for long-term storage, data lake analytics, or backup
+
+    # Full traces pipeline - sends 100% to Azure Blob Storage
+    traces/full:
+      receivers: [otlp]
+      processors: [memory_limiter, trustgateway, batch]
+      exporters: [azureblob]
+
+    # Full logs pipeline - sends 100% to Azure Blob Storage
+    logs/full:
+      receivers: [otlp]
+      processors: [memory_limiter, trustgateway, batch]
+      exporters: [azureblob]
+
+    # Full metrics pipeline - sends 100% of metrics to Azure Blob Storage
+    metrics/full-export:
+      receivers: [otlp]
+      processors: [memory_limiter, trustgateway, batch]
+      exporters: [azureblob]

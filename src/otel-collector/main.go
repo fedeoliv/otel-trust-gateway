@@ -20,6 +20,7 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
+	azureblobexporter "github.com/fedeoliv/custom-otel-collector/exporter/azureblobexporter"
 	"github.com/fedeoliv/custom-otel-collector/processor/trustgatewayprocessor"
 	azuremonitorexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/azuremonitorexporter"
 	healthcheckextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
@@ -78,6 +79,7 @@ func components() (otelcol.Factories, error) {
 	factories.Exporters = map[component.Type]exporter.Factory{
 		debugexporter.NewFactory().Type():        debugexporter.NewFactory(),
 		azuremonitorexporter.NewFactory().Type(): azuremonitorexporter.NewFactory(),
+		azureblobexporter.NewFactory().Type():    azureblobexporter.NewFactory(),
 	}
 
 	// Processors
