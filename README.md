@@ -17,6 +17,7 @@ This architecture focus on solving those three problems:
 - **🔒 Trust Gateway**: Validates device identity and authenticity before accepting any telemetry
 - **📊 Intelligent Sampling**: Configurable sampling data for cost reduction while maintaining correlated traces and logs
 - **⚡ Scalability**: Handles millions of spans per day with predictable costs and complete observability
+- **🌊 Event Streaming**: Real-time telemetry streaming to Azure Event Hubs for event-driven architectures and analytics
 - **🌐 Vendor Neutrality**: Built on OpenTelemetry standard, avoiding vendor lock-in and seamlessly switch or add observability backends
 
 > [!WARNING]
@@ -39,19 +40,30 @@ This solution is designed for **high-security, high-volume mobile applications**
 ## Features
 
 ### Security & Trust
+
 - **Trust Gateway Processor**: Custom OpenTelemetry processor that validates device attestations through HTTP headers before accepting telemetry data
 - **Header Validation**: Enforces presence of required headers (`X-App-Token`, `X-API-Key`) representing device identity claims
 - **API Key Authentication**: Validates API keys against a configured whitelist to simulate device enrollment verification
 - **Telemetry Rejection**: Automatically drops telemetry from unverified sources, preventing data pollution
 
 ### Scalability & Cost Control
+
 - **Probabilistic Sampling**: Intelligent sampling strategy (10% configurable) for high-volume trace and log data
 - **Correlated Sampling**: Traces and logs are sampled together using trace_id to maintain observability context
 - **Selective Metrics**: Full metrics collection (no sampling) for accurate dashboards and alerting
 - **Multi-Pipeline Architecture**: Separate pipelines for sampled data (cost-effective cloud storage) and full data (comprehensive analysis)
 - **Volume Management**: Designed to handle millions of spans per day while controlling cloud ingestion costs
 
+### Event Streaming & Analytics
+
+- **Azure Event Hubs Exporter**: Custom exporter streaming telemetry data to Azure Event Hubs
+- **Real-time Processing**: Event Hubs enables real-time stream processing and event-driven architectures
+- **Parquet Format Support**: Exporter supports Parquet format with Snappy compression for efficient data serialization
+- **Optional Data Lake Integration**: Configure Event Hubs Capture for automatic archival to Azure Data Lake Storage Gen2
+- **Analytics Ready**: Captured data accessible by Azure Synapse, Databricks, Spark for advanced analytics
+
 ### Deployment & Integration
+
 - **Containerized Deployment**: Production-ready Docker and Docker Compose configurations
 - **Kubernetes Ready**: Includes K8s deployment manifests for cloud-native environments
 - **Azure Application Insights**: Pre-configured for Azure Monitor integration with sampling
@@ -81,7 +93,7 @@ graph LR
         
         subgraph Exporters[Exporters]
             Azure[Azure <br/>App Insights]
-            Other[Azure<br/>Blob Storage]
+            EventHub[Azure<br/>Event Hubs]
         end
         
         Receiver --> Memory
@@ -94,12 +106,15 @@ graph LR
         TrustGW -->|100% of data| Batch2
         Batch2 --> |metrics|Azure
         
-        Batch2 -.-> |traces, metrics and logs|Other
+        Batch2 -.-> |traces, metrics and logs|EventHub
     end
     
     style Azure fill:#0078d4,stroke:#333,stroke-width:2px,color:#fff
-    style Other fill:#0078d4,stroke:#333,stroke-width:2px,color:#fff
+    style EventHub fill:#0078d4,stroke:#333,stroke-width:2px,color:#fff
 ```
+
+> [!NOTE]
+> **Optional Data Lake Integration**: Azure Event Hubs can be configured with [Event Hubs Capture](https://docs.azure.cn/en-us/event-hubs/event-hubs-capture-overview) to automatically archive raw telemetry data to Azure Data Lake Storage Gen2 for long-term retention and analytics.
 
 ## Components
 
@@ -139,29 +154,32 @@ The collector implements a sophisticated sampling strategy designed to handle la
    - Critical for accurate dashboards, alerts, and SLOs
    - Metrics typically have lower volume than traces/logs
 
-3. **Future Full Pipeline** → Other Exporters (Ready to Enable)
-   - Send 100% of all telemetry to additional systems
-   - Elasticsearch, Prometheus, custom OTLP endpoints, etc.
-   - Comprehensive data for deep analysis when needed
+3. **Full Data Pipeline** → Azure Event Hubs
+   - Send 100% of all telemetry (traces, logs, metrics) to Azure Event Hubs
+   - Real-time event streaming for downstream processing and analytics
+   - Data exported in Parquet format with Snappy compression
+   - Optional: Enable Event Hubs Capture to automatically archive to Azure Data Lake Storage Gen2
 
 #### Key Design Principles
 
 - **Correlation**: Logs inherit `trace_id` from their parent spans, ensuring sampling keeps related data together
 - **Flexibility**: Different sampling rates per pipeline - aggressive for traces/logs, none for metrics
-- **Multi-Destination**: Send sampled data to expensive cloud storage, full data to cheaper long-term storage
+- **Multi-Destination**: Send sampled data to Application Insights for real-time monitoring, full data to Event Hubs for stream processing
 - **Cost Control**: Handle millions of events per day while keeping cloud ingestion costs predictable
 - **Observability**: 10% sampling still provides statistical significance for most use cases
+- **Event Streaming**: Event Hubs enables real-time analytics, event-driven architectures, and optional data lake archival
 
 ## Prerequisites
 
 - **Go 1.24 or later** - Required to build the collector from source
 - **Docker & Docker Compose** (optional) - For containerized deployment
 - **Node.js 20+** (optional) - Only needed to run the sample mobile app
-- Azure Application Insights
+- **Azure Application Insights** for sampled telemetry data
+- **Azure Event Hubs** for streaming full telemetry data
 
 ## Getting Started
 
-### Running Locally
+### Running from source
 
 Build the OTel Collector:
 
@@ -170,10 +188,22 @@ cd src/otel-collector
 go build -o otelcol-custom .
 ```
 
-Configure Azure Application Insights:
+Configure environment variables:
 
 ```bash
+# Required: Azure Application Insights connection string
 export APPLICATIONINSIGHTS_CONNECTION_STRING="InstrumentationKey=YOUR-KEY;IngestionEndpoint=https://..."
+
+# Required: Azure Event Hubs namespace URL (for managed identity/service principal auth)
+export EVENTHUBS_NAMESPACE_URL="https://YOUR-NAMESPACE.servicebus.windows.net"
+
+# Optional: For Event Hubs connection string authentication (alternative to managed identity)
+# export EVENTHUBS_CONNECTION_STRING="Endpoint=sb://YOUR-NAMESPACE.servicebus.windows.net/;SharedAccessKeyName=...;SharedAccessKey=..."
+
+# Optional: For Azure DefaultAzureCredential (service principal)
+# export AZURE_TENANT_ID="your-tenant-id"
+# export AZURE_CLIENT_ID="your-client-id"
+# export AZURE_CLIENT_SECRET="your-client-secret"
 ```
 
 Run the Collector:
@@ -198,7 +228,7 @@ curl http://localhost:13133
 
 Use Docker for a containerized deployment with easier configuration management.
 
-Configure Azure Application Insights:
+Configure environment variables:
 
 ```bash
 cd src/otel-collector
@@ -206,8 +236,17 @@ cd src/otel-collector
 # Copy the example environment file
 cp .env.example .env
 
-# Edit .env and add your connection string
+# Edit .env and add your configuration:
 # APPLICATIONINSIGHTS_CONNECTION_STRING="InstrumentationKey=YOUR-KEY;IngestionEndpoint=https://..."
+# EVENTHUBS_NAMESPACE_URL="https://YOUR-NAMESPACE.servicebus.windows.net"
+# 
+# Optional: For connection string auth instead of managed identity
+# EVENTHUBS_CONNECTION_STRING="Endpoint=sb://YOUR-NAMESPACE.servicebus.windows.net/;SharedAccessKeyName=...;SharedAccessKey=..."
+#
+# Optional: For service principal authentication
+# AZURE_TENANT_ID="your-tenant-id"
+# AZURE_CLIENT_ID="your-client-id"
+# AZURE_CLIENT_SECRET="your-client-secret"
 ```
 
 Build and Run with Docker Compose:
@@ -319,25 +358,6 @@ The collector will reject the telemetry data, and you'll see validation warnings
 | 13133 | HTTP     | Health check endpoint |
 
 ## Development
-
-### Project Structure
-
-```
-.
-├── src/
-│   ├── otel-collector/             # Custom collector
-│   │   ├── main.go                 # Collector entry point
-│   │   ├── config.yaml             # Collector configuration
-│   │   ├── Dockerfile              # Docker build file
-│   │   ├── processor/
-│   │   │   └── trustgatewayprocessor/  # Custom processor
-│   │   │       ├── config.go       # Processor configuration
-│       ├── factory.go              # Processor factory
-│       └── processor.go            # Processor logic
-└── mobile-app/                      # Sample mobile application
-    ├── package.json
-    └── index.js                     # Mobile app code
-```
 
 ### Adding New Processors
 
