@@ -79,32 +79,65 @@ exporters:
     maxbatchinterval: 10s
     spaneventsenabled: true # Export span events to Application Insights
 
-  # Azure Blob Exporter (Custom with DefaultAzureCredential support)
+  # Azure Blob Exporter (Custom with DefaultAzureCredential support) - DISABLED FOR TESTING
   # Exports full telemetry batches to Azure Data Lake Storage
   # Uses DefaultAzureCredential for automatic credential discovery
   # - Tries environment variables first (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)
   # - Falls back to Workload Identity (AKS), Managed Identity (VM), Azure CLI, or Azure PowerShell
   # - No explicit credentials needed in config - follows Azure SDK best practices
-  azureblob:
-    url: "${env:AZURE_STORAGE_ACCOUNT_URL}"
+  # azureblob:
+  #   url: "${env:AZURE_STORAGE_ACCOUNT_URL}"
+  #   auth:
+  #     type: default_credentials # Use DefaultAzureCredential for automatic credential discovery
+  #   container:
+  #     metrics: "metrics"
+  #     logs: "logs"
+  #     traces: "traces"
+  #   blob_name_format:
+  #     metrics_format: "2006/01/02/metrics_15_04_05.parquet"
+  #     logs_format: "2006/01/02/logs_15_04_05.parquet"
+  #     traces_format: "2006/01/02/traces_15_04_05.parquet"
+  #
+  #     # Note: When using format: "parquet", change file extensions to .parquet:
+  #     serial_num_range: 10000
+  #   format: "parquet" # Options: "json", "proto", or "parquet"
+  #   # Note: "parquet" format provides better compression and is ideal for analytics workloads in Azure Data Lake
+  #   append_blob:
+  #     enabled: false
+  #     separator: "\n"
+  #   retry_on_failure:
+  #     enabled: true
+  #     initial_interval: 5s
+  #     max_interval: 30s
+  #     max_elapsed_time: 120s
+
+  # Azure Event Hubs Exporter (Custom)
+  # Streams telemetry data to Azure Event Hubs for real-time processing
+  # Uses DefaultAzureCredential for automatic credential discovery
+  # - Tries environment variables first (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)
+  # - Falls back to Workload Identity (AKS), Managed Identity (VM), Azure CLI, or Azure PowerShell
+  # - Supports multiple authentication methods including connection strings
+  azureeventhubs:
+    # Use namespace URL when using managed identity or service principal
+    namespace: "${env:EVENTHUBS_NAMESPACE_URL}"
     auth:
       type: default_credentials # Use DefaultAzureCredential for automatic credential discovery
-    container:
-      metrics: "metrics"
-      logs: "logs"
-      traces: "traces"
-    blob_name_format:
-      metrics_format: "2006/01/02/metrics_15_04_05.parquet"
-      logs_format: "2006/01/02/logs_15_04_05.parquet"
-      traces_format: "2006/01/02/traces_15_04_05.parquet"
-
-      # Note: When using format: "parquet", change file extensions to .parquet:
-      serial_num_range: 10000
-    format: "parquet" # Options: "json", "proto", or "parquet"
-    # Note: "parquet" format provides better compression and is ideal for analytics workloads in Azure Data Lake
-    append_blob:
-      enabled: false
-      separator: "\n"
+      # Alternative: use connection string
+      # type: connection_string
+      # connection_string: "${env:EVENTHUBS_CONNECTION_STRING}"
+    event_hub:
+      logs: "otel-logs"
+      metrics: "otel-metrics"
+      traces: "otel-traces"
+    format: json # Options: "json" or "proto"
+    partition_key:
+      source: trace_id # Use trace ID for consistent partitioning
+      # Alternative options:
+      # source: resource_attribute
+      # value: "service.name"  # Partition by service name
+      # source: random  # Random distribution
+    max_event_size: 1048576 # 1MB max event size (Event Hubs limit)
+    batch_size: 100
     retry_on_failure:
       enabled: true
       initial_interval: 5s
@@ -165,19 +198,43 @@ service:
     # Useful for long-term storage, data lake analytics, or backup
 
     # Full traces pipeline - sends 100% to Azure Blob Storage
-    traces/full:
-      receivers: [otlp]
-      processors: [memory_limiter, trustgateway, batch]
-      exporters: [azureblob]
+    # traces/full:
+    #   receivers: [otlp]
+    #   processors: [memory_limiter, trustgateway, batch]
+    #   exporters: [azureblob]
 
     # Full logs pipeline - sends 100% to Azure Blob Storage
-    logs/full:
-      receivers: [otlp]
-      processors: [memory_limiter, trustgateway, batch]
-      exporters: [azureblob]
+    # logs/full:
+    #   receivers: [otlp]
+    #   processors: [memory_limiter, trustgateway, batch]
+    #   exporters: [azureblob]
 
     # Full metrics pipeline - sends 100% of metrics to Azure Blob Storage
-    metrics/full-export:
+    # metrics/full-export:
+    #   receivers: [otlp]
+    #   processors: [memory_limiter, trustgateway, batch]
+    #   exporters: [azureblob]
+
+    # ============================================
+    # AZURE EVENT HUBS PIPELINES (Real-time Streaming)
+    # ============================================
+    # These pipelines send telemetry data to Azure Event Hubs for real-time processing
+    # Useful for stream processing, real-time analytics, or event-driven architectures
+
+    # Traces pipeline - streams to Event Hubs for real-time trace analysis
+    traces/eventhubs:
       receivers: [otlp]
       processors: [memory_limiter, trustgateway, batch]
-      exporters: [azureblob]
+      exporters: [azureeventhubs]
+
+    # Logs pipeline - streams to Event Hubs for real-time log processing
+    logs/eventhubs:
+      receivers: [otlp]
+      processors: [memory_limiter, trustgateway, batch]
+      exporters: [azureeventhubs]
+
+    # Metrics pipeline - streams to Event Hubs for real-time metrics processing
+    metrics/eventhubs:
+      receivers: [otlp]
+      processors: [memory_limiter, trustgateway, batch]
+      exporters: [azureeventhubs]

@@ -4,6 +4,7 @@ go 1.24.7
 
 require (
 	github.com/fedeoliv/custom-otel-collector/exporter/azureblobexporter v0.0.0-00010101000000-000000000000
+	github.com/fedeoliv/custom-otel-collector/exporter/azureeventhubsexporter v0.0.0-00010101000000-000000000000
 	github.com/fedeoliv/custom-otel-collector/processor/trustgatewayprocessor v0.0.0-00010101000000-000000000000
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/azuremonitorexporter v0.136.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.136.0
@@ -27,11 +28,13 @@ require (
 )
 
 require (
-	code.cloudfoundry.org/clock v0.0.0-20180518195852-02e53af36e6c // indirect
+	code.cloudfoundry.org/clock v1.1.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.9.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.1 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs v1.2.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.5.0 // indirect
+	github.com/Azure/go-amqp v1.0.5 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.4.2 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -47,7 +50,7 @@ require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
-	github.com/gofrs/uuid v4.0.0+incompatible // indirect
+	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
@@ -191,5 +194,7 @@ require (
 )
 
 replace github.com/fedeoliv/custom-otel-collector/exporter/azureblobexporter => ./exporter/azureblobexporter
+
+replace github.com/fedeoliv/custom-otel-collector/exporter/azureeventhubsexporter => ./exporter/azureeventhubsexporter
 
 replace github.com/fedeoliv/custom-otel-collector/processor/trustgatewayprocessor => ./processor/trustgatewayprocessor
